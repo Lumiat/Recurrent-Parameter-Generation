@@ -171,3 +171,9 @@ class ClassInput_ViTTiny_Test(ClassInput_ViTTiny):
 #                    "./dataset/your_dataset_name/generated/generated_model.pth"
 #
 # #################################### user-defined dataset classes here ####################################
+
+class SVHN_CNN(BaseDataset):
+    data_path = "./dataset/svhn_cnn/checkpoint"
+    generated_path = "./dataset/svhn_cnn/generated/generated_model.pth"
+    test_command = f"CUDA_VISIBLE_DEVICES={test_gpu_ids} python ./dataset/svhn_cnn/test.py " + \
+                   "./dataset/svhn_cnn/generated/generated_model.pth"
