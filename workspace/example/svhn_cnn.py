@@ -56,13 +56,13 @@ config = {
     "seed": SEED,
     # dataset setting
     "dataset": Dataset,
-    "dataset_name": "SVHN"
+    "dataset_name": "SVHN",
     "dim_per_token": 8192,
     "sequence_length": 'auto',
     # feature extraction setting
-    "description": 'SVHN (cropped_digits): 32×32 RGB images of single digits (0–9) cropped from Google Street View. 630,420 images: 73,257 train; 26,032 test; 531,131 extra.',
+    "description": 'SVHN (cropped_digits subset) is an image classification dataset of cropped digits derived from Google Street View house numbers. This dataset consists of 32x32 color images centered on a single digit (0-9) for the task of image classification. While the digits are centered, many images include parts of neighboring digits.',
     "sample_path": '/research-intern05/xjy/Parameter-Generator-for-Federated-Learning/dataset/checkpoint/svhn_cnn/samples',
-    "class_names": ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+    "class_names": ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
     # train setting
     "batch_size": 8,
     "num_workers": 16,
@@ -72,7 +72,7 @@ config = {
     "save_every": 80000//30,
     "print_every": 50,
     "autocast": lambda i: 5000 < i < 45000,
-    "checkpoint_save_path": "./checkpoint",
+    "checkpoint_save_path": "/research-intern05/xjy/Parameter-Generator-for-Federated-Learning/dataset/checkpoint/svhn_cnn/dataset_svhn_model_cnn_alpha_0.5_20250826-044626",
     # test setting
     "test_batch_size": 1,  # fixed, don't change this
     "generated_path": Dataset.generated_path,
@@ -98,7 +98,7 @@ config = {
         "T": 1000,
         "forward_once": True,
     },
-    "tag": "trial_heatmap_svhn_cnn",
+    "tag": "test_original_heatmap_svhn_cnn",
 }
 
 
@@ -187,7 +187,8 @@ def train():
         with accelerator.autocast(autocast_handler=AutocastKwargs(enabled=config["autocast"](batch_idx))):
             # Feature Extraction
             print("==> Extracting Feature..")
-            extractor = QwenVLFeatureExtractor("Qwen/Qwen2.5-VL-7B-Instruct")
+            # extractor = QwenVLFeatureExtractor("Qwen/Qwen2.5-VL-7B-Instruct")
+            extractor = QwenVLFeatureExtractor("/research-intern05/xjy/Recurrent-Parameter-Generation/model/Qwen2.5-VL-7B-Instruct")
             condition, generated = extractor.extract_features(
                 dataset=config["dataset_name"],
                 description=config["description"],
