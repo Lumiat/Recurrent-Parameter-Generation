@@ -173,7 +173,8 @@ class ClassInput_ViTTiny_Test(ClassInput_ViTTiny):
 # #################################### user-defined dataset classes here ####################################
 
 class SVHN_CNN(BaseDataset):
-    data_path = "./dataset/svhn_cnn/checkpoint"
+    # data_path = "./dataset/svhn_cnn/checkpoint"
+    data_path = "/research-intern05/xjy/Parameter-Generator-for-Federated-Learning/dataset/checkpoint/svhn_cnn/dataset_svhn_model_cnn_alpha_0.5_20250826-044626"
     generated_path = "./dataset/svhn_cnn/generated/generated_model.pth"
     test_command = f"CUDA_VISIBLE_DEVICES={test_gpu_ids} python ./dataset/svhn_cnn/test.py " + \
                    "./dataset/svhn_cnn/generated/generated_model.pth"
