@@ -58,13 +58,9 @@ This model was trained on the {dataset} dataset.
 Here is a brief description of the dataset:
 {description}
 
-**2. Dataset Categories and Sample Images**
-
-The following are the categories within the dataset, with a sample image for each class.
-
 """
         
-        distribution_text = """**3. Overall Dataset Class Distribution**
+        distribution_text = """**2. Overall Dataset Class Distribution**
 
 The next image is a bar chart that illustrates the distribution of samples across each class in the entire dataset. This chart shows the total number of images available for each class before any client-side distribution."""
         
@@ -81,9 +77,9 @@ This last image is a bar chart showing how the dataset is distributed among the 
         # Build content list with class samples
         content = [{"type": "text", "text": intro_text}]
         
-        for class_name in class_names:
-            content.append({"type": "text", "text": f"- **Category: {class_name}**"})
-            content.append({"type": "image", "image": f"{sample_path}/{class_name}_sample_image.png"})
+        # for class_name in class_names:
+        #     content.append({"type": "text", "text": f"- **Category: {class_name}**"})
+        #     content.append({"type": "image", "image": f"{sample_path}/{class_name}_sample_image.png"})
         
         content.extend([
             {"type": "text", "text": distribution_text},
