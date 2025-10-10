@@ -141,7 +141,15 @@ class BaseDataset(Dataset, ABC):
         self.sequence_length = None  # set in get_structure()
         # load checkpoint_list
         checkpoint_list = os.listdir(checkpoint_path)
-        self.checkpoint_list = list([os.path.join(checkpoint_path, item) for item in checkpoint_list])
+        # filter out .pth/.pt files
+        checkpoint_list = [
+            os.path.join(checkpoint_path, item)
+            for item in checkpoint_list
+            if item.endswith(".pth") or item.endswith(".pt")
+        ]
+        if len(checkpoint_list) == 0:
+            raise RuntimeError(f"No valid .pth or .pt checkpoint found in {checkpoint_path}")
+        self.checkpoint_list = checkpoint_list
         self.length = self.real_length = len(self.checkpoint_list)
         self.set_infinite_dataset()
         # get structure
