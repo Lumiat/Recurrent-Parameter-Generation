@@ -45,6 +45,8 @@ from accelerate import Accelerator
 # dataset
 from dataset import SVHN_CNN as Dataset
 from torch.utils.data import DataLoader
+from PIL import Image
+import torchvision.transforms as transforms
 
 
 
@@ -58,6 +60,25 @@ config = {
     # feature extraction setting
     "text_extractor_backbone": 'ViT-B/32',
     "image_extractor_backbone": 'resnet50',
+    "description": 
+        'SVHN dataset consists of 32x32 pixel images of house numbers captured from Google Street View. \
+        Each image contains a single digit (0-9), similar to MNIST, \
+        though some images may have distractors at the edges. \
+        The dataset has 10 classes, corresponding to the digits 0 through 9.',
+    "class_names": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+    ],
+    "class_image_paths": '',
+    "dist_image_path":'',
     "combine": 'concat', # concat, mlp, weighted_sum
     # train setting
     "batch_size": 8,
@@ -94,7 +115,7 @@ config = {
         "T": 1000,
         "forward_once": True,
     },
-    "tag": "quick_start_cifar10_resnet18",
+    "tag": "test_svhn_cnn",
 }
 
 
@@ -163,22 +184,98 @@ if __name__ == "__main__" and USE_WANDB and accelerator.is_main_process:
 
 # Feature Extraction
 print("==> Extracting Feature..")
-def extract_feature(description, image_path):
-    image_feature_extractor = ImageFeatureExtractor(config["image_extractor_backbone"])
-    text_feature_extractor = TextFeatureExtractor(config["text_extractor_backbone"])
-    image_feature = image_feature_extractor.extract(image_path)
-    text_feature = text_feature_extractor.extract(description)
-    return image_feature, text_feature
+def extract_feature(description, class_names, class_image_paths, dist_image_path):
+    """
+    :param description: str, dataset description
+    :param class_names: list[str], each class name (e.g. ["airplane", "automobile", ...])
+    :param class_image_paths: list[str], path to one sample image per class
+    :param dist_image_path: str, path to bar chart showing dataset distribution
+    """
+    assert len(class_names) == len(class_image_paths), \
+        "class_names and class_image_paths must have the same length!"
 
-def combine_feature(text_feature, image_feature):
-    text_feature_dim = text_feature.shape()
-    image_feature_dim = image_feature.shape()
-    if(config["combine"] == 'concat'):
-        feature = torch.cat([text_feature, image_feature], dim=-1)
-    elif(config["combine"] == 'mlp'):
-        fusion_mlp = FusionMLP(input_dim=text_feature_dim + image_feature_dim, hidden_dim=512, output_dim=config["model_config"]["condition_dim"])
-        feature = fusion_mlp(torch.cat([text_feature, image_feature], dim=-1))
+    # === CLIP part (text + class images) ===
+    text_extractor = TextFeatureExtractor(config["text_extractor_backbone"])
+
+    # 1) extract text features for class names
+    class_text_features = text_extractor.extract(class_names)  # shape [num_classes, dim]
+
+    # 2) extract image features for class images
+    image_feature_list = []
+    preprocess = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
+                             std=[0.26862954, 0.26130258, 0.27577711])
+    ])
+    for img_path in class_image_paths:
+        image = Image.open(img_path).convert("RGB")
+        image_tensor = preprocess(image).unsqueeze(0).to(text_extractor.device)
+        with torch.no_grad():
+            img_feature = text_extractor.model.encode_image(image_tensor)
+            img_feature = img_feature / img_feature.norm(dim=-1, keepdim=True)
+        image_feature_list.append(img_feature.squeeze(0))
+    class_image_features = torch.stack(image_feature_list, dim=0)  # shape [num_classes, dim]
+
+    # 3) fuse each (text, image) pair
+    # simple concat → [num_classes, 2*dim]
+    class_pair_features = torch.cat([class_text_features, class_image_features], dim=-1)
+
+    # 4) also include the dataset description as a global feature
+    dataset_text_feature = text_extractor.extract(description)  # shape [dim]
+    dataset_text_feature = dataset_text_feature.unsqueeze(0)   # [1, dim]
+
+    # final clip_feature = concat(global description, per-class pairs)
+    clip_feature = torch.cat([dataset_text_feature, class_pair_features.flatten().unsqueeze(0)], dim=-1)
+    # shape: [1, dim + num_classes*2*dim]
+
+    # === Distribution feature part (ResNet) ===
+    dist_feature_extractor = ImageFeatureExtractor(config["image_extractor_backbone"])
+    dist_feature = dist_feature_extractor.extract(dist_image_path)  # shape [2048] for resnet50
+
+    return clip_feature, dist_feature
+
+
+def combine_feature(clip_feature, dist_feature):
+    """
+    :param clip_feature: torch.Tensor, shape [1, dim_clip]
+    :param dist_feature: torch.Tensor, shape [1, dim_dist]
+    :return: torch.Tensor, shape [1, d_condition]
+    """
+    clip_dim = clip_feature.shape[-1]
+    dist_dim = dist_feature.shape[-1]
+    total_dim = clip_dim + dist_dim
+
+    if config["combine"] == "concat":
+        feature = torch.cat([clip_feature, dist_feature], dim=-1)
+
+    elif config["combine"] == "mlp":
+        fusion_mlp = FusionMLP(
+            input_dim=total_dim,
+            hidden_dim=512,
+            output_dim=config["model_config"]["d_condition"]
+        ).to(clip_feature.device)
+        feature = fusion_mlp(torch.cat([clip_feature, dist_feature], dim=-1))
+        return feature  # already projected to d_condition
+
+    elif config["combine"] == "weighted_sum":
+        # learnable weights
+        alpha = nn.Parameter(torch.tensor(0.5, device=clip_feature.device))
+        beta = 1 - alpha
+        # first project each feature into same dim
+        proj_clip = nn.Linear(clip_dim, config["model_config"]["d_condition"]).to(clip_feature.device)
+        proj_dist = nn.Linear(dist_dim, config["model_config"]["d_condition"]).to(clip_feature.device)
+        feature = alpha * proj_clip(clip_feature) + beta * proj_dist(dist_feature)
+        return feature  # already d_condition
+
+    else:
+        raise ValueError(f"Unknown combine mode: {config['combine']}")
+
+    # For concat case: project to d_condition
+    projector = nn.Linear(total_dim, config["model_config"]["d_condition"]).to(feature.device)
+    feature = projector(feature)
     return feature
+
 
 # Training
 print('==> Defining training..')
@@ -193,8 +290,8 @@ def train():
         # train
         # noinspection PyArgumentList
         with accelerator.autocast(autocast_handler=AutocastKwargs(enabled=config["autocast"](batch_idx))):
-            text_feature, image_feature = extract_feature(config["description"], config["image_path"])
-            condition = combine_feature(text_feature, image_feature)
+            clip_feature, dist_feature = extract_feature(config["description"], config["class_names"], config["class_image_paths"], config["dist_image_path"])
+            condition = combine_feature(clip_feature, dist_feature)
             loss = model(output_shape=param.shape, x_0=param, condition=condition, permutation_state=permutation_state)
         accelerator.backward(loss)
         optimizer.step()
