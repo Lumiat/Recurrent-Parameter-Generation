@@ -72,7 +72,7 @@ config = {
     "save_every": 80000//30,
     "print_every": 50,
     "autocast": lambda i: 5000 < i < 45000,
-    "checkpoint_save_path": "/research-intern05/xjy/Parameter-Generator-for-Federated-Learning/dataset/checkpoint/svhn_cnn/dataset_svhn_model_cnn_alpha_0.5_20250826-044626",
+    "checkpoint_save_path": "/research-intern05/xjy/Parameter-Generator-for-Federated-Learning/generated/",
     # test setting
     "test_batch_size": 1,  # fixed, don't change this
     "generated_path": Dataset.generated_path,
