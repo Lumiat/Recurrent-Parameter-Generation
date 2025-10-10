@@ -83,13 +83,13 @@ This last image is a bar chart showing how the dataset is distributed among the 
         
         for class_name in class_names:
             content.append({"type": "text", "text": f"- **Category: {class_name}**"})
-            content.append({"type": "image", "image": f"{sample_path}/{class_name}_sample_image.jpg"})
+            content.append({"type": "image", "image": f"{sample_path}/{class_name}_sample_image.png"})
         
         content.extend([
             {"type": "text", "text": distribution_text},
-            {"type": "image", "image": f"{sample_path}/overall_distribution_chart.jpg"},
+            {"type": "image", "image": f"{sample_path}/class_distribution.png"},
             {"type": "text", "text": client_distribution_text},
-            {"type": "image", "image": f"{sample_path}/client_distribution_chart.jpg"},
+            {"type": "image", "image": f"{sample_path}/client_distribution.png"},
             {"type": "text", "text": summary_request_text}
         ])
         
