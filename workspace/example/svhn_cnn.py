@@ -4,7 +4,8 @@ sys.path.append(root)
 os.chdir(root)
 with open("./workspace/config.json", "r") as f:
     additional_config = json.load(f)
-USE_WANDB = additional_config["use_wandb"]
+# USE_WANDB = additional_config["use_wandb"]
+USE_SWANLAB = additional_config["use_swanlab"]
 
 # set global seed
 import random
@@ -25,7 +26,8 @@ import random
 import warnings
 from _thread import start_new_thread
 warnings.filterwarnings("ignore", category=UserWarning)
-if USE_WANDB: import wandb
+# if USE_WANDB: import wandb
+if USE_SWANLAB: import swanlab
 # torch
 import torch
 import torch.nn as nn
@@ -35,8 +37,7 @@ from torch.cuda.amp import autocast
 # model
 from model import MambaDiffusion as Model
 from model.diffusion import DDPMSampler, DDIMSampler
-from model.fusion_mlp import FusionMLP
-from model.feature_extractor import ImageFeatureExtractor, TextFeatureExtractor
+from model.feature_extractor import QwenVLFeatureExtractor
 
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 from accelerate.utils import DistributedDataParallelKwargs
@@ -53,12 +54,13 @@ config = {
     "seed": SEED,
     # dataset setting
     "dataset": Dataset,
+    "dataset_name": "SVHN"
     "dim_per_token": 8192,
     "sequence_length": 'auto',
     # feature extraction setting
-    "text_extractor_backbone": 'ViT-B/32',
-    "image_extractor_backbone": 'resnet50',
-    "combine": 'concat', # concat, mlp, weighted_sum
+    "description": 'SVHN (cropped_digits): 32×32 RGB images of single digits (0–9) cropped from Google Street View. 630,420 images: 73,257 train; 26,032 test; 531,131 extra.',
+    "sample_path": '/research-intern05/xjy/Parameter-Generator-for-Federated-Learning/dataset/checkpoint/svhn_cnn/samples',
+    "class_names": ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
     # train setting
     "batch_size": 8,
     "num_workers": 16,
@@ -94,7 +96,7 @@ config = {
         "T": 1000,
         "forward_once": True,
     },
-    "tag": "quick_start_cifar10_resnet18",
+    "tag": "trial_heatmap_svhn_cnn",
 }
 
 
@@ -157,33 +159,20 @@ if __name__ == "__main__":
 
 
 # wandb
-if __name__ == "__main__" and USE_WANDB and accelerator.is_main_process:
-    wandb.login(key=additional_config["wandb_api_key"])
-    wandb.init(project="Recurrent-Parameter-Generation", name=config['tag'], config=config,)
+# if __name__ == "__main__" and USE_WANDB and accelerator.is_main_process:
+    # wandb.login(key=additional_config["wandb_api_key"])
+    # wandb.init(project="Recurrent-Parameter-Generation", name=config['tag'], config=config,)
 
-# Feature Extraction
-print("==> Extracting Feature..")
-def extract_feature(description, image_path):
-    image_feature_extractor = ImageFeatureExtractor(config["image_extractor_backbone"])
-    text_feature_extractor = TextFeatureExtractor(config["text_extractor_backbone"])
-    image_feature = image_feature_extractor.extract(image_path)
-    text_feature = text_feature_extractor.extract(description)
-    return image_feature, text_feature
-
-def combine_feature(text_feature, image_feature):
-    text_feature_dim = text_feature.shape()
-    image_feature_dim = image_feature.shape()
-    if(config["combine"] == 'concat'):
-        feature = torch.cat([text_feature, image_feature], dim=-1)
-    elif(config["combine"] == 'mlp'):
-        fusion_mlp = FusionMLP(input_dim=text_feature_dim + image_feature_dim, hidden_dim=512, output_dim=config["model_config"]["condition_dim"])
-        feature = fusion_mlp(torch.cat([text_feature, image_feature], dim=-1))
-    return feature
+# swanlab
+if __name__ == "__main__" and USE_SWANLAB and accelerator.is_main_process:
+    swanlab.login(api_key=additional_config["swanlab_api_key"])
+    swanlab.init(project="Recurrent-Parameter-Generation", name=config['tag'], config=config,)
 
 # Training
 print('==> Defining training..')
 def train():
-    if not USE_WANDB:
+    # if not USE_WANDB:
+    if not USE_SWANLAB:
         train_loss = 0
         this_steps = 0
     print("==> Start training..")
@@ -193,17 +182,31 @@ def train():
         # train
         # noinspection PyArgumentList
         with accelerator.autocast(autocast_handler=AutocastKwargs(enabled=config["autocast"](batch_idx))):
-            text_feature, image_feature = extract_feature(config["description"], config["image_path"])
-            condition = combine_feature(text_feature, image_feature)
+            # Feature Extraction
+            print("==> Extracting Feature..")
+            extractor = QwenVLFeatureExtractor("Qwen/Qwen2.5-VL-7B-Instruct")
+            condition, generated = extractor.extract_features(
+                dataset=config["dataset_name"],
+                description=config["description"],
+                sample_path=config["sample_path"],
+                class_names=config["class_names"],
+                generate=False)
+            if generated:
+                print(f"\nGenerated text:\n{generated}")
+            print(f"Shape of condition: {condition.shape}")
             loss = model(output_shape=param.shape, x_0=param, condition=condition, permutation_state=permutation_state)
         accelerator.backward(loss)
         optimizer.step()
         if accelerator.is_main_process:
             scheduler.step()
         # to logging losses and print and save
-        if USE_WANDB and accelerator.is_main_process:
-            wandb.log({"train_loss": loss.item()})
-        elif USE_WANDB:
+        # if USE_WANDB and accelerator.is_main_process:
+            # wandb.log({"train_loss": loss.item()})
+        # elif USE_WANDB:
+            # pass  # don't print
+        if USE_SWANLAB and accelerator.is_main_process:
+            swanlab.log({"train_loss": loss.item()})
+        elif USE_SWANLAB:
             pass  # don't print
         else:  # not use wandb
             train_loss += loss.item()
@@ -228,8 +231,10 @@ def generate(save_path=config["generated_path"], need_test=True):
         prediction = model(sample=True)
         generated_norm = prediction.abs().mean()
     print("Generated_norm:", generated_norm.item())
-    if USE_WANDB:
-        wandb.log({"generated_norm": generated_norm.item()})
+    # if USE_WANDB:
+        # wandb.log({"generated_norm": generated_norm.item()})
+    if USE_SWANLAB:
+        swanlab.log({"generated_norm": generated_norm.item()})
     train_set.save_params(prediction, save_path=save_path)
     if need_test:
         start_new_thread(os.system, (config["test_command"],))
