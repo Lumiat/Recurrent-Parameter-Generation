@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 
-class CNN(nn.Module):
+class Model(nn.Module):
     def __init__(self, image_size, num_classes, in_channels):
-        super(CNN, self).__init__()
+        super(Model, self).__init__()
         
         self.conv1 = torch.nn.Sequential(
             torch.nn.Conv2d(in_channels, 16, kernel_size=5, padding=2), 
