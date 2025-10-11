@@ -198,6 +198,7 @@ def train():
             if generated:
                 print(f"\nGenerated text:\n{generated}")
             print(f"Shape of condition: {condition.shape}")
+            print(f"condition dim: {condition.shape[-1]}")
             loss = model(output_shape=param.shape, x_0=param, condition=condition, permutation_state=permutation_state)
         accelerator.backward(loss)
         optimizer.step()
