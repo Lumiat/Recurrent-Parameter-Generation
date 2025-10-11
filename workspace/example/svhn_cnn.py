@@ -64,7 +64,7 @@ config = {
     "sample_path": '/research-intern05/xjy/Parameter-Generator-for-Federated-Learning/dataset/checkpoint/svhn_cnn/samples',
     "class_names": ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
     # train setting
-    "batch_size": 8,
+    "batch_size": 2,
     "num_workers": 16,
     "total_steps": 80000,
     "learning_rate": 0.00003,
@@ -81,14 +81,14 @@ config = {
     "model_config": {
         "num_permutation": 'auto',
         # mamba config
-        "d_condition": 1,
+        "d_condition": 3584, # 1
         "d_model": 8192,
         "d_state": 128,
         "d_conv": 4,
         "expand": 2,
         "num_layers": 2,
         # diffusion config
-        "diffusion_batch": 512,
+        "diffusion_batch": 64, # 512
         "layer_channels": [1, 32, 64, 128, 64, 32, 1],
         "model_dim": "auto",
         "condition_dim": "auto",
@@ -169,7 +169,19 @@ if __name__ == "__main__":
 if __name__ == "__main__" and USE_SWANLAB and accelerator.is_main_process:
     swanlab.login(api_key=additional_config["swanlab_api_key"])
     swanlab.init(project="Recurrent-Parameter-Generation", name=config['tag'], config=config,)
-
+# Feature Extraction
+print("==> Extracting Feature..")
+# extractor = QwenVLFeatureExtractor("Qwen/Qwen2.5-VL-7B-Instruct")
+extractor = QwenVLFeatureExtractor("/research-intern05/xjy/Recurrent-Parameter-Generation/model/Qwen2.5-VL-7B-Instruct")
+condition, generated = extractor.extract_features(
+    dataset=config["dataset_name"],
+    description=config["description"],
+    sample_path=config["sample_path"],
+    class_names=config["class_names"],
+    generate=False)
+if generated:
+    print(f"\nGenerated text:\n{generated}")
+    print(f"Shape of condition: {condition.shape}")
 
 # Training
 print('==> Defining training..')
@@ -185,19 +197,6 @@ def train():
         # train
         # noinspection PyArgumentList
         with accelerator.autocast(autocast_handler=AutocastKwargs(enabled=config["autocast"](batch_idx))):
-            # Feature Extraction
-            print("==> Extracting Feature..")
-            # extractor = QwenVLFeatureExtractor("Qwen/Qwen2.5-VL-7B-Instruct")
-            extractor = QwenVLFeatureExtractor("/research-intern05/xjy/Recurrent-Parameter-Generation/model/Qwen2.5-VL-7B-Instruct")
-            condition, generated = extractor.extract_features(
-                dataset=config["dataset_name"],
-                description=config["description"],
-                sample_path=config["sample_path"],
-                class_names=config["class_names"],
-                generate=False)
-            if generated:
-                print(f"\nGenerated text:\n{generated}")
-            print(f"Shape of condition: {condition.shape}")
             loss = model(output_shape=param.shape, x_0=param, condition=condition, permutation_state=permutation_state)
         accelerator.backward(loss)
         optimizer.step()
@@ -232,7 +231,7 @@ def generate(save_path=config["generated_path"], need_test=True):
     print("\n==> Generating..")
     model.eval()
     with torch.no_grad():
-        prediction = model(sample=True)
+        prediction = model(condition=condition, sample=True)
         generated_norm = prediction.abs().mean()
     print("Generated_norm:", generated_norm.item())
     # if USE_WANDB:
