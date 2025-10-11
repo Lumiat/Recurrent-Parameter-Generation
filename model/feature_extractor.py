@@ -20,7 +20,8 @@ class QwenVLFeatureExtractor:
         """
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             model_name, 
-            torch_dtype="auto", 
+            torch_dtype=torch.bfloat16,
+            attn_implementation="flash_attention_2",
             device_map=device
         )
         self.processor = AutoProcessor.from_pretrained(model_name)
@@ -144,8 +145,6 @@ This last image is a bar chart showing how the dataset is distributed among the 
         with torch.no_grad():
             outputs = self.model(
                 input_ids=inputs.input_ids,
-                pixel_values=inputs.pixel_values,
-                vision_attention_mask=inputs.vision_attention_mask,
                 attention_mask=inputs.attention_mask,
                 output_hidden_states=True
             )
