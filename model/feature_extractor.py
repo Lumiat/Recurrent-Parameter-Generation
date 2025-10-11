@@ -26,6 +26,7 @@ class QwenVLFeatureExtractor:
         )
         self.processor = AutoProcessor.from_pretrained(model_name)
         self.device = "cuda" if device == "auto" and torch.cuda.is_available() else device
+        self.model.eval()
         
     def _build_prompt_template(
         self, 
@@ -167,7 +168,9 @@ This last image is a bar chart showing how the dataset is distributed among the 
                     skip_special_tokens=True,
                     clean_up_tokenization_spaces=False
                 )
-        
+
+        del outputs, last_hidden_state
+        torch.cuda.empty_cache()
         return prompt_embedding, generated_text
 
 
