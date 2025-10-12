@@ -240,7 +240,10 @@ def generate(save_path=config["generated_path"], need_test=True):
         swanlab.log({"generated_norm": generated_norm.item()})
     train_set.save_params(prediction, save_path=save_path)
     if need_test:
+        log_path = os.path.join(save_path, "test_output.log")
+        command = f"{config['test_command']} >> {log_path} 2>&1 &"
         start_new_thread(os.system, (config["test_command"],))
+        os.system(command)
     model.train()
     return prediction
 
