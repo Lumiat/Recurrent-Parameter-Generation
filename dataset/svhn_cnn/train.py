@@ -2,9 +2,6 @@
 import random
 import numpy as np
 import torch
-import sys, os
-sys.path.append(os.path.dirname(__file__))
-
 seed = SEED = 20
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
@@ -27,6 +24,7 @@ from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from torchvision.datasets import SVHN as Dataset
 from tqdm.auto import tqdm
+import os
 import warnings
 import json
 warnings.filterwarnings("ignore", category=UserWarning)
