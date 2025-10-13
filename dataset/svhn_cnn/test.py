@@ -1,5 +1,7 @@
 import os
 import sys
+from datetime import datetime
+
 if __name__ == "__main__":
     from train import *
 else:  # relative import
@@ -39,13 +41,31 @@ for item in test_items:
         result_data = {
             "loss": float(loss),
             "acc": float(acc),
-            "model_path": item
+            "model_path": item,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
+        
         result_dir = os.path.dirname(result_file)
         if result_dir:
             os.makedirs(result_dir, exist_ok=True)
         
+        existing_results = []
+        if os.path.exists(result_file):
+            try:
+                with open(result_file, 'r') as f:
+                    content = f.read().strip()
+                    if content:  
+                        existing_results = json.loads(content)
+                        if isinstance(existing_results, dict):
+                            existing_results = [existing_results]
+            except (json.JSONDecodeError, ValueError):
+                existing_results = []
+        
+        print(f"Results saved to {result_file}", flush=True)
+
+        existing_results.append(result_data)
+    
         with open(result_file, 'w') as f:
-            json.dump(result_data, f, indent=2)
+            json.dump(existing_results, f, indent=2)
         
         print(f"Results saved to {result_file}", flush=True)
