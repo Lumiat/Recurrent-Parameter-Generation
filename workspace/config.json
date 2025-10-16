@@ -1,1 +1,9 @@
-{"use_wandb": false, "wandb_api_key": null, "use_swanlab": false, "swanlab_api_key": "t069AsDNDqmzxtaFH1vaA", "test_gpu_ids": "0"}
+{
+  "use_wandb": false,
+  "wandb_api_key": null,
+  "use_swanlab": true,
+  "swanlab_api_key": "t069AsDNDqmzxtaFH1vaA",
+  "test_gpu_ids": "0",
+  "seed": 3407,
+  "tag": "original_bar_no_sample_qwen7b"
+}
