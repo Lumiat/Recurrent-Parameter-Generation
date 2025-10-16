@@ -105,7 +105,7 @@ test_loader = DataLoader(
 # -----------------------------
 # Model
 # -----------------------------
-model, head = Model()
+model = Model(image_size=32, num_classes=10, in_channels=3)
 model = model.to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=config["learning_rate"], momentum=0.9)
