@@ -6,7 +6,8 @@ config_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "workspac
 with open(config_file, "r") as f:
     running_config = json.load(f)
 test_gpu_ids = running_config["test_gpu_ids"]
-
+seed = running_config["seed"]
+tag = running_config["tag"]
 
 
 
@@ -175,6 +176,6 @@ class ClassInput_ViTTiny_Test(ClassInput_ViTTiny):
 class SVHN_CNN(BaseDataset):
     # data_path = "./dataset/svhn_cnn/checkpoint"
     data_path = "/research-intern05/xjy/Parameter-Generator-for-Federated-Learning/dataset/checkpoint/svhn_cnn/dataset_svhn_model_cnn_alpha_0.5_20250826-044626"
-    generated_path = "./dataset/svhn_cnn/generated/generated_model.pth"
-    test_command = f"CUDA_VISIBLE_DEVICES={test_gpu_ids} python ./dataset/svhn_cnn/test.py " + \
-                   "./dataset/svhn_cnn/generated/generated_model.pth ./dataset/svhn_cnn/generated/test_output.json"
+    generated_path = f"./dataset/svhn_cnn/generated/{tag}_seed_{seed}_generated_model.pth"
+    test_command = f"CUDA_VISIBLE_DEVICES={test_gpu_ids} /root/miniconda3/envs/rpg/bin/python ./dataset/svhn_cnn/test.py " + \
+                   f"./dataset/svhn_cnn/generated/{tag}_seed_{seed}_generated_model.pth ./dataset/svhn_cnn/generated/{tag}_seed_{seed}_test_result.json"
