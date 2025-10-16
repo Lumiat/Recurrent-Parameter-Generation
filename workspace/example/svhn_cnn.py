@@ -11,7 +11,7 @@ USE_SWANLAB = additional_config["use_swanlab"]
 import random
 import numpy as np
 import torch
-seed = SEED = 999
+seed = SEED = additional_config["seed"]
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
@@ -98,7 +98,7 @@ config = {
         "T": 1000,
         "forward_once": True,
     },
-    "tag": "test_original_heatmap_svhn_cnn",
+    "tag": additional_config["tag"],
 }
 
 
@@ -168,7 +168,7 @@ if __name__ == "__main__":
 # swanlab
 if __name__ == "__main__" and USE_SWANLAB and accelerator.is_main_process:
     swanlab.login(api_key=additional_config["swanlab_api_key"])
-    swanlab.init(project="Recurrent-Parameter-Generation", name=config['tag'], config=config,)
+    swanlab.init(project="Recurrent-Parameter-Generation", name=config['tag']+f"_seed_{seed}", config=config,)
 # Feature Extraction
 print("==> Extracting Feature..")
 # extractor = QwenVLFeatureExtractor("Qwen/Qwen2.5-VL-7B-Instruct")
@@ -221,7 +221,7 @@ def train():
         if batch_idx % config["save_every"] == 0 and accelerator.is_main_process:
             os.makedirs(config["checkpoint_save_path"], exist_ok=True)
             state = accelerator.unwrap_model(model).state_dict()
-            torch.save(state, os.path.join(config["checkpoint_save_path"], config["tag"]+".pth"))
+            torch.save(state, os.path.join(config["checkpoint_save_path"], config["tag"]+f"_seed_{seed}.pth"))
             generate(save_path=config["generated_path"], need_test=True)
         if batch_idx >= config["total_steps"]:
             break

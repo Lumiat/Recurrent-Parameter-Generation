@@ -37,6 +37,7 @@ from torch.cuda.amp import autocast
 # model
 from model import MambaDiffusion as Model
 from model.diffusion import DDPMSampler, DDIMSampler
+from model.feature_extractor import QwenVLFeatureExtractorNoSample
 
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 from accelerate.utils import DistributedDataParallelKwargs
@@ -58,6 +59,9 @@ config = {
     "dataset_name": "SVHN",
     "dim_per_token": 8192,
     "sequence_length": 'auto',
+    # feature extraction setting
+    "description": 'SVHN (cropped_digits subset) is an image classification dataset of cropped digits derived from Google Street View house numbers. This dataset consists of 32x32 color images centered on a single digit (0-9) for the task of image classification. While the digits are centered, many images include parts of neighboring digits.',
+    "sample_path": '/research-intern05/xjy/Parameter-Generator-for-Federated-Learning/dataset/checkpoint/svhn_cnn/samples',
     # train setting
     "batch_size": 2,
     "num_workers": 16,
@@ -76,7 +80,7 @@ config = {
     "model_config": {
         "num_permutation": 'auto',
         # mamba config
-        "d_condition": 1, # 1
+        "d_condition": 3584, # 1
         "d_model": 8192,
         "d_state": 128,
         "d_conv": 4,
@@ -93,7 +97,7 @@ config = {
         "T": 1000,
         "forward_once": True,
     },
-    "tag": "test_svhn_cnn_no_cond",
+    "tag": additional_config["tag"],
 }
 
 
@@ -164,7 +168,18 @@ if __name__ == "__main__":
 if __name__ == "__main__" and USE_SWANLAB and accelerator.is_main_process:
     swanlab.login(api_key=additional_config["swanlab_api_key"])
     swanlab.init(project="Recurrent-Parameter-Generation", name=config['tag']+f"_seed_{seed}", config=config,)
-
+# Feature Extraction
+print("==> Extracting Feature..")
+# extractor = QwenVLFeatureExtractorNoSample("Qwen/Qwen2.5-VL-7B-Instruct")
+extractor = QwenVLFeatureExtractorNoSample("/research-intern05/xjy/Recurrent-Parameter-Generation/model/Qwen2.5-VL-7B-Instruct")
+condition, generated = extractor.extract_features(
+    dataset=config["dataset_name"],
+    description=config["description"],
+    sample_path=config["sample_path"],
+    generate=False)
+if generated:
+    print(f"\nGenerated text:\n{generated}")
+    print(f"Shape of condition: {condition.shape}")
 
 # Training
 print('==> Defining training..')
@@ -180,7 +195,7 @@ def train():
         # train
         # noinspection PyArgumentList
         with accelerator.autocast(autocast_handler=AutocastKwargs(enabled=config["autocast"](batch_idx))):
-            loss = model(output_shape=param.shape, x_0=param, permutation_state=permutation_state)
+            loss = model(output_shape=param.shape, x_0=param, condition=condition, permutation_state=permutation_state)
         accelerator.backward(loss)
         optimizer.step()
         if accelerator.is_main_process:
@@ -214,7 +229,7 @@ def generate(save_path=config["generated_path"], need_test=True):
     print("\n==> Generating..")
     model.eval()
     with torch.no_grad():
-        prediction = model(sample=True)
+        prediction = model(condition=condition, sample=True)
         generated_norm = prediction.abs().mean()
     print("Generated_norm:", generated_norm.item())
     # if USE_WANDB:
