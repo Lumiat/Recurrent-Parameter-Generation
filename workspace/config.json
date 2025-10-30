@@ -4,6 +4,6 @@
   "use_swanlab": true,
   "swanlab_api_key": "t069AsDNDqmzxtaFH1vaA",
   "test_gpu_ids": "0",
-  "seed": 42,
-  "tag": "original_bar_no_sample_qwen7b"
+  "seed": 3407,
+  "tag": "original_bar_part_class_qwen7b"
 }
