@@ -37,7 +37,7 @@ from torch.cuda.amp import autocast
 # model
 from model import MambaDiffusion as Model
 from model.diffusion import DDPMSampler, DDIMSampler
-from model.feature_extractor import QwenVLFeatureExtractor
+from model.feature_extractor import QwenVLFeatureExtractorPartClass
 
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 from accelerate.utils import DistributedDataParallelKwargs
@@ -172,7 +172,7 @@ if __name__ == "__main__" and USE_SWANLAB and accelerator.is_main_process:
 # Feature Extraction
 print("==> Extracting Feature..")
 # extractor = QwenVLFeatureExtractor("Qwen/Qwen2.5-VL-7B-Instruct")
-extractor = QwenVLFeatureExtractor("/research-intern05/xjy/Recurrent-Parameter-Generation/model/Qwen2.5-VL-7B-Instruct")
+extractor = QwenVLFeatureExtractorPartClass("/research-intern05/xjy/Recurrent-Parameter-Generation/model/Qwen2.5-VL-7B-Instruct")
 condition, generated = extractor.extract_features(
     dataset=config["dataset_name"],
     description=config["description"],
